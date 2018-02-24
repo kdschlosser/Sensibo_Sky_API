@@ -77,11 +77,11 @@ class Notify(object):
             if guid in callbacks:
                 del (callbacks[guid])
 
-    def __call__(self, event, value):
+    def __call__(self, event, value, obj):
 
         def process_callbacks(e):
             for callback in self.__callbacks[e].values():
-                callback(event, value)
+                callback(event, value, obj)
 
         for evt in self.__callbacks.keys():
             if ('*' in evt or '?' in evt) and fnmatch.fnmatch(event, evt):
@@ -433,13 +433,14 @@ class Pod(object):
             if mode != old_state['mode']:
                 self._mode = Mode(self, mode, self.capabilities['mode'][mode])
                 old_state['mode'] = mode
-                Notify('{0}.mode'.format(self.name), mode)
+                Notify('{0}.mode'.format(self.name), mode.name, self)
 
             if swing != old_state['swing']:
                 old_state['swing'] = swing
                 Notify(
                     '{0}.swing'.format(self.__event_name),
-                    swing
+                    swing,
+                    self._mode
                 )
 
             if temp != old_state['targetTemperature']:
@@ -447,14 +448,16 @@ class Pod(object):
 
                 Notify(
                     '{0}.temp'.format(self.__event_name),
-                    temp
+                    temp,
+                    self._mode
                 )
 
             if fan != old_state['fanLevel']:
                 old_state['fanLevel'] = fan
                 Notify(
                     '{0}.fan_level'.format(self.__event_name),
-                    fan
+                    fan,
+                    self._mode
                 )
 
             if power != old_state['on']:
@@ -462,7 +465,8 @@ class Pod(object):
 
                 Notify(
                     '{0}.power'.format(self.name),
-                    bool(power)
+                    bool(power),
+                    self
                 )
 
             if temp_unit != old_state['temperatureUnit']:
@@ -470,7 +474,8 @@ class Pod(object):
 
                 Notify(
                     '{0}.temp_unit'.format(self.__event_name),
-                    temp_unit
+                    temp_unit,
+                    self._mode
                 )
 
             if humidity != old_measurements['humidity']:
@@ -478,7 +483,8 @@ class Pod(object):
 
                 Notify(
                     '{0}.humidity'.format(self.name),
-                    humidity
+                    humidity,
+                    self
                 )
 
             if temperature != old_measurements['temperature']:
@@ -486,7 +492,8 @@ class Pod(object):
 
                 Notify(
                     '{0}.temp'.format(self.name),
-                    temperature
+                    temperature,
+                    self
                 )
 
             if 'batteryVoltage' in measurements:
@@ -496,7 +503,8 @@ class Pod(object):
 
                     Notify(
                         '{0}.battery_voltage'.format(self.name),
-                        battery
+                        battery,
+                        self
                     )
 
             self._event.wait(poll_interval)
@@ -624,7 +632,7 @@ class Pod(object):
             raise AttributeError
 
     @property
-    def humidity(self):
+    def room_humidity(self):
         """
         Humidity.
 
@@ -638,7 +646,7 @@ class Pod(object):
             raise AttributeError
 
     @property
-    def temp(self):
+    def room_temp(self):
         """
         Temperature. (not the set point)
 
@@ -778,19 +786,24 @@ class Pod(object):
         property_names = (
             'mode',
             'power',
-            'temp',
-            'humidity',
+            'room_temp',
+            'room_humidity',
             'battery_voltage',
             '*'
         )
 
-        if property_name not in property_names:
+        if property_name in property_names[:6]:
+            return Notify.bind(
+                '{0}.{1}'.format(self.name, property_name),
+                callback
+            )
+        elif property_name in property_names[6:]:
+            return Notify.bind(
+                '{0}.*.{1}'.format(self.name, property_name),
+                callback
+            )
+        else:
             raise ValueError
-
-        return Notify.bind(
-            '{0}.{1}'.format(self.name, property_name),
-            callback
-        )
 
 
 class Client(object):
@@ -798,8 +811,25 @@ class Client(object):
     def __init__(self, api_key):
         self._api_key = api_key
 
-    def bind(self, event, callback):
-        return Notify.bind(event, callback)
+    def bind(self, property_name, callback):
+
+        property_names = (
+            'mode',
+            'power',
+            'room_temp',
+            'room_humidity',
+            'battery_voltage',
+            'swing',
+            'temp',
+            'fan_level',
+            'temp_unit',
+            '*'
+        )
+
+        if property_name not in property_names:
+            raise ValueError
+
+        return Notify.bind('*' + property_name, callback)
 
     def unbind(self, guid):
         Notify.unbind(guid)
