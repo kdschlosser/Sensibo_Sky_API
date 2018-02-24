@@ -1,23 +1,44 @@
 # -*- coding: utf-8 -*-
+#
+#     pySensibo_Sky - A python library to access the Sensibo Sky API
+#     Copyright (C) 2018  Kevin G. Schlosser
+#
+#
+#     This program is free software; you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation; either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License along
+#     with this program; if not, write to the Free Software Foundation, Inc.,
+#     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import sys
 import os
 
-
 pth = sys.executable
+pth = os.path.split(pth)[0]
 
 if 'eventghost' in pth.lower():
-    pth = os.path.split(pth)[0]
-    pth = os.path.join(pth, 'lib27', 'site-packages')
+    pth = os.path.join(pth, 'lib27')
     sys.path += [pth]
-    os.environ['REQUESTS_CA_BUNDLE'] = (
-        os.path.join(pth, 'requests', 'cacert.pem')
-    )
 else:
-    os.environ['REQUESTS_CA_BUNDLE'] = (
-        r'c:\program files (x86)\eventghost\lib27'
-        r'\site-packages\requests\cacert.pem'
-    )
+    pth = os.path.join(pth, 'lib')
+    # os.environ['REQUESTS_CA_BUNDLE'] = (
+    #     r'c:\program files (x86)\eventghost\lib27'
+    #     r'\site-packages\requests\cacert.pem'
+    # )
+
+ca_path = os.path.join(pth, 'site-packages', 'requests')
+
+if os.path.isdir(ca_path) and 'cacert.pem' in os.listdir(ca_path):
+    os.environ['REQUESTS_CA_BUNDLE'] = os.path.join(ca_path, 'cacert.pem')
+
 
 import threading  # NOQA
 import requests  # NOQA
