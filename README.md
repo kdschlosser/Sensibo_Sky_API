@@ -2,6 +2,14 @@
 ***pySensibo_Sky***
 ===================
 
+Requires the requests library to be installed.
+
+If you receive an SSL error this is because you do not have a suitable
+certificate to connect with the server. You need to place a pem
+container with valid certificates into the requests library root
+directory. The file must be named cacerts.pem
+
+
 *Connection:*
 _____________
 
