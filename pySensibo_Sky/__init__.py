@@ -808,7 +808,7 @@ class Pod(object):
     def __getattr__(self, item):
         if item in self.__dict__:
             return self.__dict__[item]
-        
+
         for mode in self.supported_modes:
             if mode.name == item:
                 return mode
