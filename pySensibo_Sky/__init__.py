@@ -390,7 +390,7 @@ class Mode(object):
             raise ValueError
 
         return Notify.bind(
-            '{0}.{1}.{2}'.format(self._pod.name, self.name, property_name),
+            '{0}.{1}.{2}'.format(str(self._pod.name), self.name, property_name),
             callback
         )
 
@@ -400,7 +400,12 @@ class Pod(object):
 
     def __init__(self, api_key, name, uid):
         self._api_key = api_key
-        self.name = name
+
+        try:
+            self.name = name.decode('utf-8')
+        except UnicodeEncodeError:
+            self.name = name
+
         self.uid = uid
         self._model = None
         self._capabilities = None
@@ -512,8 +517,18 @@ class Pod(object):
                 old_measurements['humidity'] = humidity
 
                 Notify(
-                    '{0}.humidity'.format(self.name),
+                    '{0}.room_humidity'.format(self.name),
                     humidity,
+                    self
+                )
+                Notify(
+                    '{0}.room_dew_point'.format(self.name),
+                    self.room_dew_point,
+                    self
+                )
+                Notify(
+                    '{0}.room_heat_index'.format(self.name),
+                    self.room_heat_index,
                     self
                 )
 
@@ -521,8 +536,18 @@ class Pod(object):
                 old_measurements['temperature'] = temperature
 
                 Notify(
-                    '{0}.temp'.format(self.name),
+                    '{0}.room_temp'.format(str(self.name)),
                     temperature,
+                    self
+                )
+                Notify(
+                    '{0}.room_dew_point'.format(self.name),
+                    self.room_dew_point,
+                    self
+                )
+                Notify(
+                    '{0}.room_heat_index'.format(self.name),
+                    self.room_heat_index,
                     self
                 )
 
@@ -792,10 +817,10 @@ class Pod(object):
     def set_state(self, **kwargs):
         data = dict(
             currentAcState=self.state,
-            newValue=kwargs.values()[0]
+            newValue=list(kwargs.values())[0]
         )
         self._patch(
-            kwargs.keys()[0],
+            list(kwargs.keys())[0],
             json.dumps(data)
         )
 
@@ -899,12 +924,12 @@ class Pod(object):
 
         if property_name in property_names[:6]:
             return Notify.bind(
-                '{0}.{1}'.format(self.name, property_name),
+                '{0}.{1}'.format(str(self.name), property_name),
                 callback
             )
         elif property_name in property_names[6:]:
             return Notify.bind(
-                '{0}.*.{1}'.format(self.name, property_name),
+                '{0}.*.{1}'.format(str(self.name), property_name),
                 callback
             )
         else:
@@ -1078,7 +1103,7 @@ if __name__ == "__main__":
     dev = None
     poll_guid = None
 
-    def _callback(ev, vl):
+    def _callback(ev, vl, _):
         print(ev, '=', vl)
 
     while True:
