@@ -18,6 +18,7 @@
 #     with this program; if not, write to the Free Software Foundation, Inc.,
 #     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from __future__ import print_function
 import sys
 import os
 
@@ -893,6 +894,16 @@ class Client(object):
     def get_device(self, name):
         devices = self.devices
 
+        try:
+            name = name.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                name = (
+                    name.decode('latin-1').encode('utf-8')
+                )
+            except UnicodeDecodeError:
+                pass
+
         for pod_name in devices.keys():
             try:
                 pd_name = pod_name.decode('utf-8')
@@ -911,7 +922,11 @@ class Client(object):
 
 
 if __name__ == "__main__":
-    a_key = raw_input('Enter API Key: ')
+    try:
+        a_key = raw_input('Enter API Key: ').strip()
+    except NameError:
+        a_key = input('Enter API Key: ').strip()
+
     client = Client(a_key)
 
     HELP = '''
@@ -963,44 +978,39 @@ if __name__ == "__main__":
                                    "start poll 0.5" - every 1/2 a second
 
     '''
-    print '"help" for a list of commands'
+    print('"help" for a list of commands')
     dev = None
     poll_guid = None
 
     def _callback(ev, vl):
-        print ev, '=', vl
+        print(ev, '=', vl)
 
     while True:
         try:
-            command = raw_input('Enter Command: ').strip()
+            try:
+                command = raw_input('Enter Command: ').strip()
+            except NameError:
+                command = input('Enter Command: ').strip()
 
             if command == 'help':
-                print HELP
+                print(HELP)
                 continue
 
             if command == 'list devices':
-                print "-" * 10, "devices", "-" * 10
+                print("-" * 10, "devices", "-" * 10)
                 for d in client.device_names:
-                    print d
-                print '-' * 29
+                    print(d)
+                print('-' * 29)
                 continue
 
             if dev is None and 'connect' not in command:
-                print 'You need to connect to a device first'
-                print
-                print HELP
+                print('You need to connect to a device first')
+                print()
+                print(HELP)
                 continue
 
             if 'connect' in command:
                 device_name = command.replace('connect ', '')
-
-                try:
-                    device_name = device_name.decode('utf-8')
-                except UnicodeDecodeError:
-                    device_name = (
-                        device_name.decode('latin-1').encode('utf-8')
-                    )
-
                 dev = client.get_device(device_name)
 
             elif command == 'info':
@@ -1018,33 +1028,33 @@ if __name__ == "__main__":
                 for d_attr in device_attrs:
                     attr = getattr(dev, d_attr.lower().replace(' ', '_'), None)
                     if isinstance(attr, list):
-                        print 'Device', d_attr + ':'
+                        print('Device', d_attr + ':')
                         for list_item in attr:
-                            print '   ', list_item
+                            print('   ', list_item)
                     else:
-                        print 'Device', d_attr + ':', attr
+                        print('Device', d_attr + ':', attr)
 
-                print 'Set Mode:', dev.mode.name
+                print('Set Mode:', dev.mode.name)
 
                 try:
-                    print 'Set Temp:', dev.mode.temp, dev.mode.temp_unit
+                    print('Set Temp:', dev.mode.temp, dev.mode.temp_unit)
                 except AttributeError:
                     pass
 
                 try:
-                    print 'Set Fan Level:', dev.mode.fan_level
+                    print('Set Fan Level:', dev.mode.fan_level)
                 except AttributeError:
                     pass
 
                 try:
-                    print 'Set Swing Mode:', dev.mode.swing
+                    print('Set Swing Mode:', dev.mode.swing)
                 except AttributeError:
                     pass
 
-                print 'Supported Modes:'
+                print('Supported Modes:')
 
                 for m in dev.supported_modes:
-                    print '   ', m.name
+                    print('   ', m.name)
                     mode_attrs = (
                         'Supported Swing Modes',
                         'Supported Temp Units',
@@ -1062,15 +1072,15 @@ if __name__ == "__main__":
 
                         def iter_attr(a, label, indent):
                             if isinstance(attr, list):
-                                print indent, label + ':'
+                                print(indent, label + ':')
                                 for itm in a:
-                                    print indent, '  ', itm
+                                    print(indent, '  ', itm)
                             elif isinstance(a, dict):
-                                print indent, label + ':'
+                                print(indent, label + ':')
                                 for k, v in a.items():
                                     iter_attr(v, k, indent + '    ')
                             else:
-                                print indent, label + ':', a
+                                print(indent, label + ':', a)
 
 
                         iter_attr(attr, m_attr, '       ')
@@ -1092,21 +1102,21 @@ if __name__ == "__main__":
                         dev.power = command
 
                     else:
-                        print 'on' if dev.power else 'off'
+                        print('on' if dev.power else 'off')
                 elif command.startswith('operating mode'):
                     command = command.replace('operating mode', '').strip()
                     if command:
                         dev.mode = command
 
                     else:
-                        print dev.mode.name
+                        print(dev.mode.name)
                 elif command.startswith('scale'):
                     command = command.replace('scale', '').strip()
                     if command:
                         dev.mode.temp_unit = command
 
                     else:
-                        print dev.mode.temp_unit
+                        print(dev.mode.temp_unit)
                 elif command.startswith('temperature setpoint'):
                     command = command.replace(
                         'temperature setpoint',
@@ -1117,21 +1127,21 @@ if __name__ == "__main__":
                         dev.mode.temp = int(command)
 
                     else:
-                        print dev.mode.temp
+                        print(dev.mode.temp)
                 elif command.startswith('swing mode'):
                     command = command.replace('swing mode', '').strip()
                     if command:
                         dev.mode.swing = command
 
                     else:
-                        print dev.mode.swing
+                        print(dev.mode.swing)
                 elif command.startswith('fan level'):
                     command = command.replace('fan level', '').strip()
                     if command:
                         dev.mode.fan_level = command
 
                     else:
-                        print dev.mode.fan_level
+                        print(dev.mode.fan_level)
 
                 elif command.startswith('start poll'):
                     command = command.replace('start poll', '').strip()
@@ -1146,39 +1156,39 @@ if __name__ == "__main__":
                         poll_guid = dev.bind('*', _callback)
 
                 elif command == 'temperature':
-                    print dev.temp
+                    print(dev.temp)
                 elif command == 'humidity':
-                    print dev.humidity
+                    print(dev.humidity)
                 elif command == 'battery voltage':
-                    print dev.battery_voltage
+                    print(dev.battery_voltage)
                 elif command == 'firmware version':
-                    print dev.firmware_version
+                    print(dev.firmware_version)
                 elif command == 'model number':
-                    print dev.model
+                    print(dev.model)
                 elif command == 'uid':
-                    print dev.uid
+                    print(dev.uid)
                 elif command == 'supported operating modes':
                     for m in dev.supported_modes:
-                        print m.name
+                        print(m.name)
                 elif command == 'supported temperature setpoints':
                     for t in dev.mode.supported_temps:
-                        print t
+                        print(t)
                 elif command == 'supported scales':
                     for u in dev.mode.supported_temp_units:
-                        print u
+                        print(u)
                 elif command == 'supported swing modes':
                     for s in dev.mode.supported_swing_modes:
-                        print s
+                        print(s)
                 elif command == 'supported fan levels':
                     for f in dev.mode.supported_fan_levels:
-                        print f
+                        print(f)
                 else:
                     raise AttributeError
             except AttributeError:
-                print 'Command not valid for this device/mode'
+                print('Command not valid for this device/mode')
                 continue
             except ValueError:
-                print 'setting value not allowed for this command'
+                print('setting value not allowed for this command')
                 continue
 
             except Exception:
