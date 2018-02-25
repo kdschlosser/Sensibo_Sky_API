@@ -26,7 +26,7 @@ pth = os.path.split(pth)[0]
 
 if 'eventghost' in pth.lower():
     pth = os.path.join(pth, 'lib27')
-    sys.path += [pth]
+    sys.path += [os.path.join(pth, 'site_packages')]
 else:
     pth = os.path.join(pth, 'lib')
     # os.environ['REQUESTS_CA_BUNDLE'] = (
