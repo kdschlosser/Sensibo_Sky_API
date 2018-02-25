@@ -664,7 +664,7 @@ class Pod(object):
     @property
     def room_humidity(self):
         """
-        Humidity.
+        Room Humidity.
 
         *Returns:* The humidity in the room.
 
@@ -678,7 +678,7 @@ class Pod(object):
     @property
     def room_temp(self):
         """
-        Temperature. (not the set point)
+        Room Temperature.
 
         *Returns:* The temperature of the room.
 
@@ -691,6 +691,13 @@ class Pod(object):
 
     @property
     def room_dew_point(self):
+        """
+        Room Dew Point.
+
+        *Returns:* The dew point in the room.
+
+        *Return type:* `float`
+        """
         temp = self.room_temp
         humidity = self.room_humidity
 
@@ -718,6 +725,13 @@ class Pod(object):
 
     @property
     def room_heat_index(self):
+        """
+        Room Heat Index.
+
+        *Returns:* The heat index in the room.
+
+        *Return type:* `float`
+        """
         temp = self.room_temp
         humidity = self.room_humidity
 
