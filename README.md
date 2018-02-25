@@ -55,7 +55,7 @@ __________________
  The modes are singleton classes instances just like the devices are.
  So we are able to store them for future use.
 
- To set the mode we are able to do this one of 2 ways.
+ To set the mode we are able to do this one of 4 ways.
 
  Using the *`Mode`* instance.
 
@@ -70,6 +70,10 @@ __________________
 
      device.mode = 'heat'
 
+ You can also access the mode as an attribute of the device.
+
+     device.heat.activate()
+
  The only issue with using the name of the mode is unless you have
  verified that your unit supports the mode it can raise a `ValueError`.
  That is why it is best to use the supported modes to gather the modes
@@ -82,12 +86,22 @@ __________________
 *Room Temperature:*
 ___________________
 
-    print '{0:.2f}'.format(device.temp)
+    print '{0:.2f}'.format(device.room_temp)
 
 *Room Humidity:*
 ________________
 
-    print '{0:.2f}'.format(device.humidity)
+    print '{0:.2f}'.format(device.room_humidity)
+
+*Room Dew Point:*
+________________
+
+    print '{0:.2f}'.format(device.room_dew_point)
+
+*Room Heat Index:*
+________________
+
+    print '{0:.2f}'.format(device.room_heat_index)
 
 *Device Power:*
 _______________

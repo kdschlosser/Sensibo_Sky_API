@@ -690,7 +690,7 @@ class Pod(object):
             raise AttributeError
 
     @property
-    def dew_point(self):
+    def room_dew_point(self):
         temp = self.room_temp
         humidity = self.room_humidity
 
@@ -717,7 +717,7 @@ class Pod(object):
         return dew_point
 
     @property
-    def heat_index(self):
+    def room_heat_index(self):
         temp = self.room_temp
         humidity = self.room_humidity
 
@@ -1227,9 +1227,9 @@ if __name__ == "__main__":
                         poll_guid = dev.bind('*', _callback)
 
                 elif command == 'temperature':
-                    print(dev.temp)
+                    print(dev.room_temp)
                 elif command == 'humidity':
-                    print(dev.humidity)
+                    print(dev.room_humidity)
                 elif command == 'battery voltage':
                     print(dev.battery_voltage)
                 elif command == 'firmware version':
@@ -1239,9 +1239,9 @@ if __name__ == "__main__":
                 elif command == 'uid':
                     print(dev.uid)
                 elif command == 'heat index':
-                    print(dev.heat_index)
+                    print(dev.room_heat_index)
                 elif command == 'dew point':
-                    print(dev.dew_point)
+                    print(dev.room_dew_point)
                 elif command == 'supported operating modes':
                     for m in dev.supported_modes:
                         print(m.name)
