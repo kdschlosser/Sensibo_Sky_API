@@ -513,43 +513,51 @@ class Pod(object):
                     self._mode
                 )
 
-            if humidity != old_measurements['humidity']:
-                old_measurements['humidity'] = humidity
+            def hi_dp_event():
+                Notify(
+                    '{0}.room_dew_point'.format(self.name),
+                    self.room_dew_point,
+                    self
+                )
+                Notify(
+                    '{0}.room_heat_index'.format(self.name),
+                    self.room_heat_index,
+                    self
+                )
 
+            def rh_event():
                 Notify(
                     '{0}.room_humidity'.format(self.name),
                     humidity,
                     self
                 )
-                Notify(
-                    '{0}.room_dew_point'.format(self.name),
-                    self.room_dew_point,
-                    self
-                )
-                Notify(
-                    '{0}.room_heat_index'.format(self.name),
-                    self.room_heat_index,
-                    self
-                )
 
-            if temperature != old_measurements['temperature']:
-                old_measurements['temperature'] = temperature
-
+            def temp_event():
                 Notify(
                     '{0}.room_temp'.format(str(self.name)),
                     temperature,
                     self
                 )
-                Notify(
-                    '{0}.room_dew_point'.format(self.name),
-                    self.room_dew_point,
-                    self
-                )
-                Notify(
-                    '{0}.room_heat_index'.format(self.name),
-                    self.room_heat_index,
-                    self
-                )
+                
+            if (
+                humidity != old_measurements['humidity'] and
+                temperature != old_measurements['temperature']
+            ):
+                old_measurements['temperature'] = temperature
+                old_measurements['humidity'] = humidity
+                temp_event()
+                rh_event()
+                hi_dp_event()
+
+            elif temperature != old_measurements['temperature']:
+                old_measurements['temperature'] = temperature
+                temp_event()
+                hi_dp_event()
+
+            elif humidity != old_measurements['humidity']:
+                old_measurements['humidity'] = humidity
+                rh_event()
+                hi_dp_event()
 
             if 'batteryVoltage' in measurements:
                 battery = measurements['batteryVoltage']
