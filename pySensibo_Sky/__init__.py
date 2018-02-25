@@ -986,6 +986,8 @@ class Client(object):
                 )
             except UnicodeDecodeError:
                 pass
+        except AttributeError:
+            pass
 
         for pod_name in devices.keys():
             try:
@@ -995,13 +997,22 @@ class Client(object):
                     pd_name = pod_name.decode('latin-1').decode('utf-8')
                 except UnicodeEncodeError:
                     pd_name = pod_name
+            except AttributeError:
+                pd_name = pod_name
 
             if pd_name == name:
-                return Pod(
-                    self._api_key,
-                    pd_name.encode('utf-8'),
-                    devices[pod_name]
-                )
+                try:
+                    return Pod(
+                        self._api_key,
+                        pd_name.encode('utf-8'),
+                        devices[pod_name]
+                    )
+                except AttributeError:
+                    return Pod(
+                        self._api_key,
+                        pd_name,
+                        devices[pod_name]
+                    )
 
 
 if __name__ == "__main__":
@@ -1097,6 +1108,7 @@ if __name__ == "__main__":
             if 'connect' in command:
                 device_name = command.replace('connect ', '')
                 dev = client.get_device(device_name)
+                continue
 
             elif command == 'info':
                 device_attrs = (
@@ -1106,8 +1118,10 @@ if __name__ == "__main__":
                     'Firmware Version',
                     'Battery Voltage',
                     'Power',
-                    'Temp',
-                    'Humidity'
+                    'Room Temp',
+                    'Room Humidity',
+                    'Room Dew Point',
+                    'Room Heat Index'
                 )
 
                 for d_attr in device_attrs:
