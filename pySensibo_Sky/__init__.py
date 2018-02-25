@@ -52,6 +52,14 @@ from uuid import uuid4 as new_guid  # NOQA
 _SERVER = 'https://home.sensibo.com/api/v2'
 
 
+def c2f(c_temp):
+    return float(c_temp) * 9.0 / 5.0 + 32.0
+
+
+def f2c(f_temp):
+    return (float(f_temp) - 32.0) * 5.0 / 9.0
+
+
 class Singleton(type):
     _instances = {}
 
@@ -682,6 +690,67 @@ class Pod(object):
             raise AttributeError
 
     @property
+    def dew_point(self):
+        temp = self.room_temp
+        humidity = self.room_humidity
+
+        fnht = self.mode.temp_unit.lower().startswith('f')
+
+        if fnht:
+            temp = f2c(temp)
+
+        if temp > 0:
+            var1 = 17.368
+            var2 = 238.88
+        else:
+            var1 = 17.966
+            var2 = 247.15
+
+        import math
+
+        pa = humidity / 100. * math.exp(var1 * temp / (var2 + temp))
+        dew_point = var2 * math.log(pa) / (var1 - math.log(pa))
+
+        if fnht:
+            dew_point = c2f(dew_point)
+
+        return dew_point
+
+    @property
+    def heat_index(self):
+        temp = self.room_temp
+        humidity = self.room_humidity
+
+        clcs = self.mode.temp_unit.lower().startswith('c')
+
+        if clcs:
+            temp = c2f(temp)
+
+        heat_index = (
+            0.5 * (temp + 61.0 + (temp - 68.0) * 1.2 + humidity * 0.094)
+        )
+
+        if heat_index >= 80:
+            import math
+
+            heat_index = math.fsum([
+                -42.379,
+                2.04901523 * temp,
+                10.14333127 * humidity,
+                -0.22475541 * temp * humidity,
+                -6.83783e-3 * temp ** 2,
+                -5.481717e-2 * humidity ** 2,
+                1.22874e-3 * temp ** 2 * humidity,
+                8.5282e-4 * temp * humidity ** 2,
+                -1.99e-6 * temp ** 2 * humidity ** 2,
+            ])
+
+        if clcs:
+            heat_index = f2c(heat_index)
+
+        return heat_index
+
+    @property
     def state(self):
         """
         Gets the supported temperature units for this device mode.
@@ -945,6 +1014,8 @@ if __name__ == "__main__":
     fan level - Gets the fan level (speed)
     temperature - Gets the room temperature.
     humidity - Gets the room humidity.
+    heat index - Gets the room heat index.
+    dew point - Gets the room dew point.
     battery voltage - Gets the battery voltage (if supported)
     firmware version - Gets the firmware revision.
     model number - Gets the model number.
@@ -1167,6 +1238,10 @@ if __name__ == "__main__":
                     print(dev.model)
                 elif command == 'uid':
                     print(dev.uid)
+                elif command == 'heat index':
+                    print(dev.heat_index)
+                elif command == 'dew point':
+                    print(dev.dew_point)
                 elif command == 'supported operating modes':
                     for m in dev.supported_modes:
                         print(m.name)
