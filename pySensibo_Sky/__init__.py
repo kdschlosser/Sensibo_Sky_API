@@ -22,6 +22,8 @@ from __future__ import print_function
 import sys
 import os
 
+PY2 = sys.version_info.major == 2
+
 pth = sys.executable
 pth = os.path.split(pth)[0]
 
@@ -30,16 +32,11 @@ if 'eventghost' in pth.lower():
     sys.path += [os.path.join(pth, 'site-packages')]
 else:
     pth = os.path.join(pth, 'lib')
-    # os.environ['REQUESTS_CA_BUNDLE'] = (
-    #     r'c:\program files (x86)\eventghost\lib27'
-    #     r'\site-packages\requests\cacert.pem'
-    # )
 
 ca_path = os.path.join(pth, 'site-packages', 'requests')
 
 if os.path.isdir(ca_path) and 'cacert.pem' in os.listdir(ca_path):
     os.environ['REQUESTS_CA_BUNDLE'] = os.path.join(ca_path, 'cacert.pem')
-
 
 import threading  # NOQA
 import requests  # NOQA
@@ -390,7 +387,11 @@ class Mode(object):
             raise ValueError
 
         return Notify.bind(
-            '{0}.{1}.{2}'.format(str(self._pod.name), self.name, property_name),
+            '{0}.{1}.{2}'.format(
+                self._pod.name,
+                self.name,
+                property_name
+            ),
             callback
         )
 
@@ -401,10 +402,10 @@ class Pod(object):
     def __init__(self, api_key, name, uid):
         self._api_key = api_key
 
-        try:
-            self.name = name.decode('utf-8')
-        except UnicodeEncodeError:
-            self.name = name
+        if PY2:
+            self.name = name.encode('utf-8')
+        else:
+            self.name = str(name)
 
         self.uid = uid
         self._model = None
@@ -435,9 +436,6 @@ class Pod(object):
     def is_polling(self):
         return self._thread is not None and not self._event.isSet()
 
-    @property
-    def __event_name(self):
-        return '{0}.{1}'.format(self.name, self._mode.name)
 
     def _poll(self, poll_interval):
         old_state = dict()
@@ -473,7 +471,7 @@ class Pod(object):
             if swing != old_state['swing']:
                 old_state['swing'] = swing
                 Notify(
-                    '{0}.swing'.format(self.__event_name),
+                    '{0}.{1}.swing'.format(self.name, self._mode.name),
                     swing,
                     self._mode
                 )
@@ -482,7 +480,7 @@ class Pod(object):
                 old_state['targetTemperature'] = temp
 
                 Notify(
-                    '{0}.temp'.format(self.__event_name),
+                    '{0}.{1].temp'.format(self.name, self._mode.name),
                     temp,
                     self._mode
                 )
@@ -490,7 +488,7 @@ class Pod(object):
             if fan != old_state['fanLevel']:
                 old_state['fanLevel'] = fan
                 Notify(
-                    '{0}.fan_level'.format(self.__event_name),
+                    '{0}.{1}.fan_level'.format(self.name, self._mode.name),
                     fan,
                     self._mode
                 )
@@ -508,7 +506,7 @@ class Pod(object):
                 old_state['temperatureUnit'] = temp_unit
 
                 Notify(
-                    '{0}.temp_unit'.format(self.__event_name),
+                    '{0}.{1}.temp_unit'.format(self.name, self._mode.name),
                     temp_unit,
                     self._mode
                 )
@@ -534,11 +532,11 @@ class Pod(object):
 
             def temp_event():
                 Notify(
-                    '{0}.room_temp'.format(str(self.name)),
+                    '{0}.room_temp'.format(self.name),
                     temperature,
                     self
                 )
-                
+
             if (
                 humidity != old_measurements['humidity'] and
                 temperature != old_measurements['temperature']
@@ -748,6 +746,7 @@ class Pod(object):
 
         import math
 
+
         pa = humidity / 100. * math.exp(var1 * temp / (var2 + temp))
         dew_point = var2 * math.log(pa) / (var1 - math.log(pa))
 
@@ -779,6 +778,7 @@ class Pod(object):
 
         if heat_index >= 80:
             import math
+
 
             heat_index = math.fsum([
                 -42.379,
@@ -932,12 +932,12 @@ class Pod(object):
 
         if property_name in property_names[:6]:
             return Notify.bind(
-                '{0}.{1}'.format(str(self.name), property_name),
+                '{0}.{1}'.format(self.name, property_name),
                 callback
             )
         elif property_name in property_names[6:]:
             return Notify.bind(
-                '{0}.*.{1}'.format(str(self.name), property_name),
+                '{0}.*.{1}'.format(self.name, property_name),
                 callback
             )
         else:
@@ -1034,39 +1034,63 @@ class Client(object):
                 pd_name = pod_name
 
             if pd_name == name:
-                try:
-                    return Pod(
-                        self._api_key,
-                        pd_name.encode('utf-8'),
-                        devices[pod_name]
-                    )
-                except AttributeError:
-                    return Pod(
-                        self._api_key,
-                        pd_name,
-                        devices[pod_name]
-                    )
+                return Pod(
+                    self._api_key,
+                    pd_name,
+                    devices[pod_name]
+                )
 
 
 if __name__ == "__main__":
-    try:
-        a_key = raw_input('Enter API Key: ').strip()
-    except NameError:
-        a_key = input('Enter API Key: ').strip()
 
-    client = Client(a_key)
+    def get_client():
+        try:
+            a_key = raw_input('Enter API Key: ').strip()
+        except NameError:
+            a_key = input('Enter API Key: ').strip()
+
+        try:
+            return Client(a_key)
+        except:
+            print('Invalid API key or unable to connect to server.')
+            return get_client()
+
+    client = get_client()
+
+
+
+    def connect_device():
+        print("-" * 10, "devices", "-" * 10)
+        for d in client.device_names:
+            print(d)
+        print('-' * 29)
+
+        try:
+            dev_name = raw_input('Enter device name to connect to: ').strip()
+        except NameError:
+            dev_name = input('Enter device name to connect to: ').strip()
+
+        try:
+            d = client.get_device(dev_name)
+            print('Successfully connected to ' + dev_name)
+            return d
+        except:
+            print('Invalid device.')
+            return connect_device()
+
+    dev = connect_device()
 
     HELP = '''
     Commands
 
     list devices - Lists all devices (pods)
 
-    connect DEVICE NAME - Use this to connect to a device (pod), replace 
+    connect DEVICE NAME - Use this to connect to a device (pod), replace
                           DEVICE NAME with the name of the device.
 
     power - Gets the power state.
     operating mode - Gets the operating mode.
-    scale = Gets the scale (unit of measure). 
+    scale = Gets the scale (unit of measure).
     temperature setpoint - Gets the temperature setpoint.
     swing mode - Gets the swing mode.
     fan level - Gets the fan level (speed)
@@ -1084,13 +1108,13 @@ if __name__ == "__main__":
     device supports.
 
     supported operating modes
-    supported temperature setpoints 
+    supported temperature setpoints
     supported scales
-    supported swing modes 
+    supported swing modes
     supported fan levels
 
 
-    Use the following items to set specific features. Replace the argument 
+    Use the following items to set specific features. Replace the argument
     name in capital letters with the value you want to use.
 
     operating mode MODE NAME
@@ -1100,7 +1124,7 @@ if __name__ == "__main__":
     power POWER
     scale SCALE
 
-    start poll POLLING SPEED - poll the device for changes. 
+    start poll POLLING SPEED - poll the device for changes.
                                POLLING SPEED is in seconds
                                example:
                                    "start poll 2.0" - every 2 seconds
@@ -1108,11 +1132,12 @@ if __name__ == "__main__":
 
     '''
     print('"help" for a list of commands')
-    dev = None
     poll_guid = None
+
 
     def _callback(ev, vl, _):
         print(ev, '=', vl)
+
 
     while True:
         try:
@@ -1141,6 +1166,7 @@ if __name__ == "__main__":
             if 'connect' in command:
                 device_name = command.replace('connect ', '')
                 dev = client.get_device(device_name)
+                print('Successfully connected to ' + device_name)
                 continue
 
             elif command == 'info':
@@ -1276,7 +1302,7 @@ if __name__ == "__main__":
                         print(dev.mode.fan_level)
 
                 elif command.startswith('start poll'):
-                    command = command.replace('start poll', '').strip()
+                    command = command.replace('start poll ', '').strip()
 
                     if poll_guid is not None:
                         client.unbind(poll_guid)
@@ -1286,7 +1312,12 @@ if __name__ == "__main__":
                     if command and command != '0.0':
                         dev.start_poll(float(command))
                         poll_guid = dev.bind('*', _callback)
+                        print('Polling started.')
 
+                    else:
+                        print('Polling stopped.')
+
+                    continue
                 elif command == 'temperature':
                     print(dev.room_temp)
                 elif command == 'humidity':
@@ -1329,6 +1360,7 @@ if __name__ == "__main__":
 
             except Exception:
                 import traceback
+
 
                 traceback.print_exc()
                 continue
