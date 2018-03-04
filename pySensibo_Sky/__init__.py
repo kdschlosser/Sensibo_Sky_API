@@ -126,11 +126,7 @@ class Mode(object):
     def __init__(self, pod, name, supported):
         self._pod = pod
         self.name = name
-        self._swing = self.swing
         self._supported = supported
-        self._temp = self.temp
-        self._temp_unit = self.temp_unit
-        self._fan = self.fan_level
 
     @property
     def supported_swing_modes(self):
@@ -181,7 +177,10 @@ class Mode(object):
 
         *Return type:* `list`
         """
-        temp_unit = self.temp_unit
+        try:
+            temp_unit = self.temp_unit
+        except AttributeError:
+            raise AttributeError
 
         if (
             'temperatures' in self._supported and
@@ -268,7 +267,7 @@ class Mode(object):
         state = self._pod.state
         if 'temperatureUnit' in state:
             return state['temperatureUnit']
-        raise ValueError
+        raise AttributeError
 
     @temp_unit.setter
     def temp_unit(self, value):
@@ -315,7 +314,7 @@ class Mode(object):
     def temp(self, value):
         value = int(value)
         try:
-            if value in self.supported_temps[self.temp_unit]['values']:
+            if value in self.supported_temps:
                 self._pod.set_state(targetTemperature=value)
             else:
                 raise ValueError
@@ -400,6 +399,9 @@ class Pod(object):
     __metaclass__ = Singleton
 
     def __init__(self, api_key, name, uid):
+        self.__fnht = None
+        self.__clcs = None
+
         self._api_key = api_key
 
         if PY2:
@@ -466,39 +468,90 @@ class Pod(object):
         """
         return self._thread is not None and not self._event.isSet()
 
-
     def _poll(self, poll_interval):
-        old_state = dict()
+        old_state = dict(
+            mode=None,
+            swing=None,
+            targetTemperature=None,
+            fanLevel=None,
+            on=None,
+            temperatureUnit=None
+        )
+
         for key, value in self.state.items():
             old_state[key] = value
 
         measurements = self._measurements
 
         old_measurements = dict(
-            temperature=measurements['temperature'],
-            humidity=measurements['humidity']
+            temperature=None,
+            humidity=None,
+            batteryVoltage=None
         )
+
+        if 'temperature' in measurements:
+            old_measurements['temperature'] = measurements['temperature']
+
+        if 'humidity' in measurements:
+            old_measurements['humidity'] = measurements['humidity']
+
         if 'batteryVoltage' in measurements:
             old_measurements['batteryVoltage'] = measurements['batteryVoltage']
 
         while not self._event.isSet():
             state = self.state
             measurements = self._measurements
-            mode = state['mode']
-            swing = state['swing']
-            temp = state['targetTemperature']
-            fan = state['fanLevel']
-            power = state['on']
-            temp_unit = state['temperatureUnit']
-            humidity = measurements['humidity']
-            temperature = measurements['temperature']
 
-            if mode != old_state['mode']:
-                self._mode = Mode(self, mode, self.capabilities['mode'][mode])
+            if 'mode' in state:
+                mode = state['mode']
+            else:
+                mode = None
+
+            if 'swing' in state:
+                swing = state['swing']
+            else:
+                swing = None
+
+            if 'targetTemperature' in state:
+                temp = state['targetTemperature']
+            else:
+                temp = None
+
+            if 'fanLevel' in state:
+                fan = state['fanLevel']
+            else:
+                fan = None
+
+            if 'on' in state:
+                power = state['on']
+            else:
+                power = None
+
+            if 'temperatureUnit' in state:
+                temp_unit = state['temperatureUnit']
+            else:
+                temp_unit = None
+
+            if 'temperature' in measurements:
+                temperature = measurements['temperature']
+            else:
+                temperature = None
+            if 'humidity' in measurements:
+                humidity = measurements['humidity']
+            else:
+                humidity = None
+
+            if 'batteryVoltage' in measurements:
+                battery_voltage = measurements['batteryVoltage']
+            else:
+                battery_voltage = None
+
+            if mode is not None and mode != old_state['mode']:
+                self._mode = Mode(self, mode, self.capabilities['modes'][mode])
                 old_state['mode'] = mode
-                Notify('{0}.mode'.format(self.name), mode.name, self)
+                Notify('{0}.mode'.format(self.name), self._mode.name, self)
 
-            if swing != old_state['swing']:
+            if swing is not None and swing != old_state['swing']:
                 old_state['swing'] = swing
                 Notify(
                     '{0}.{1}.swing'.format(self.name, self._mode.name),
@@ -506,16 +559,16 @@ class Pod(object):
                     self._mode
                 )
 
-            if temp != old_state['targetTemperature']:
+            if temp is not None and temp != old_state['targetTemperature']:
                 old_state['targetTemperature'] = temp
 
                 Notify(
-                    '{0}.{1].temp'.format(self.name, self._mode.name),
+                    '{0}.{1}.temp'.format(self.name, self._mode.name),
                     temp,
                     self._mode
                 )
 
-            if fan != old_state['fanLevel']:
+            if fan is not None and fan != old_state['fanLevel']:
                 old_state['fanLevel'] = fan
                 Notify(
                     '{0}.{1}.fan_level'.format(self.name, self._mode.name),
@@ -523,7 +576,7 @@ class Pod(object):
                     self._mode
                 )
 
-            if power != old_state['on']:
+            if power is not None and power != old_state['on']:
                 old_state['on'] = power
 
                 Notify(
@@ -532,7 +585,10 @@ class Pod(object):
                     self
                 )
 
-            if temp_unit != old_state['temperatureUnit']:
+            if (
+                temp_unit is not None and
+                temp_unit != old_state['temperatureUnit']
+            ):
                 old_state['temperatureUnit'] = temp_unit
 
                 Notify(
@@ -542,16 +598,19 @@ class Pod(object):
                 )
 
             def hi_dp_event():
-                Notify(
-                    '{0}.room_dew_point'.format(self.name),
-                    self.room_dew_point,
-                    self
-                )
-                Notify(
-                    '{0}.room_heat_index'.format(self.name),
-                    self.room_heat_index,
-                    self
-                )
+                try:
+                    Notify(
+                        '{0}.room_dew_point'.format(self.name),
+                        self.room_dew_point,
+                        self
+                    )
+                    Notify(
+                        '{0}.room_heat_index'.format(self.name),
+                        self.room_heat_index,
+                        self
+                    )
+                except AttributeError:
+                    pass
 
             def rh_event():
                 Notify(
@@ -587,16 +646,14 @@ class Pod(object):
                 rh_event()
                 hi_dp_event()
 
-            if 'batteryVoltage' in measurements:
-                battery = measurements['batteryVoltage']
-                if old_measurements['batteryVoltage'] != battery:
-                    old_measurements['batteryVoltage'] = battery
+            if battery_voltage != old_measurements['batteryVoltage']:
+                old_measurements['batteryVoltage'] = battery_voltage
 
-                    Notify(
-                        '{0}.battery_voltage'.format(self.name),
-                        battery,
-                        self
-                    )
+                Notify(
+                    '{0}.battery_voltage'.format(self.name),
+                    battery_voltage,
+                    self
+                )
 
             self._event.wait(poll_interval)
 
@@ -762,7 +819,13 @@ class Pod(object):
         temp = self.room_temp
         humidity = self.room_humidity
 
-        fnht = self.mode.temp_unit.lower().startswith('f')
+        try:
+            self.__fnht = fnht = self.mode.temp_unit.lower().startswith('f')
+            self.__clcs = not self.__fnht
+        except AttributeError:
+            if self.__fnht is None:
+                raise AttributeError
+            fnht = self.__fnht
 
         if fnht:
             temp = f2c(temp)
@@ -775,7 +838,6 @@ class Pod(object):
             var2 = 247.15
 
         import math
-
 
         pa = humidity / 100. * math.exp(var1 * temp / (var2 + temp))
         dew_point = var2 * math.log(pa) / (var1 - math.log(pa))
@@ -797,7 +859,13 @@ class Pod(object):
         temp = self.room_temp
         humidity = self.room_humidity
 
-        clcs = self.mode.temp_unit.lower().startswith('c')
+        try:
+            self.__clcs = clcs = self.mode.temp_unit.lower().startswith('c')
+            self.__fnht = not self.__clcs
+        except AttributeError:
+            if self.__clcs is None:
+                raise AttributeError
+            clcs = self.__clcs
 
         if clcs:
             temp = c2f(temp)
@@ -808,7 +876,6 @@ class Pod(object):
 
         if heat_index >= 80:
             import math
-
 
             heat_index = math.fsum([
                 -42.379,
@@ -1118,7 +1185,6 @@ class Client(object):
         try:
             name = name.decode('utf-8')
         except UnicodeDecodeError:
-
             try:
                 name = (
                     name.decode('latin-1').decode('utf-8')
@@ -1163,8 +1229,6 @@ if __name__ == "__main__":
             return get_client()
 
     client = get_client()
-
-
 
     def connect_device():
         print("-" * 10, "devices", "-" * 10)
