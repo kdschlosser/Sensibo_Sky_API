@@ -417,6 +417,23 @@ class Pod(object):
         self._thread = None
 
     def start_poll(self, poll_interval):
+        """
+        Start polling.
+
+        Starts a polling cycle for a Sensibo device. When a polling cycle is
+        started for each device a new thread is created so the cycles can run
+        parallel to each other.
+
+        :param poll_interval: how often to check, decimal notation of seconds.
+        Example:
+            * ``0.5`` - half a second
+            * ``1.0`` - one second
+            * ``2.25`` - two and a quarter seconds
+        :type poll_interval: float
+
+        :return: None
+        :rtype: None
+        """
         while self._event.isSet():
             pass
 
@@ -428,12 +445,25 @@ class Pod(object):
             self._thread.start()
 
     def stop_poll(self):
+        """
+        Stops the polling cycle.
+
+        Stops the polling cycle if one is running.
+
+        :return: None
+        :rtype: None
+        """
         if self._thread is not None:
             self._event.set()
             self._thread.join(3)
 
     @property
     def is_polling(self):
+        """
+        Checks if there is a running polling cycle.
+        :return: True/False
+        :rtype: bool
+        """
         return self._thread is not None and not self._event.isSet()
 
 
@@ -799,21 +829,6 @@ class Pod(object):
 
     @property
     def state(self):
-        """
-        Gets the supported temperature units for this device mode.
-
-        *Returns:* A `list` of supported temperature units.
-
-            Example list items:
-
-                * ``"C"``
-                * ``"F"``
-                * ``"Celsius"``.
-                * ``"Fahrenheit"``.
-
-        *Return type:* `list`
-        """
-
         result = self._get(
             "acStates",
             limit=1,
@@ -921,6 +936,35 @@ class Pod(object):
         raise AttributeError
 
     def bind(self, property_name, callback):
+        """
+        Bind event.
+
+        Bind a callback to a specific setting change on the Sensibo device.
+        This will bind a callback for this device only. You must have a
+        polling cycle running to recieve a callback.
+
+        :param property_name: The name of the item to monitor for changes.
+        Can be one of the following:
+
+            * ``'mode'`` - Operating mode.
+            * ``'power'`` - Power.
+            * ``'room_temp'`` - Temperature of the room.
+            * ``'room_humidity'`` - Humidity of the room.
+            * ``'battery_voltage'`` - Battery voltage (if supported)
+            * ``'*'`` - All of the above
+
+        :type property_name: str
+        :param callback: Callable object.
+        When called there are 3 arguments that are passed:
+
+            * event - A ``str`` that represents the name of the event.
+            * value - The new value that has been set.
+            * event object - the object that holds the property that has
+            changed. This will be either a :class:`Pod` instance or a
+            :class:`Mode` instance
+        :return: A unique identifier that is used when unbind from the event.
+        :rtype: str
+        """
         property_names = (
             'mode',
             'power',
@@ -960,6 +1004,39 @@ class Client(object):
         self._api_key = api_key
 
     def bind(self, property_name, callback):
+        """
+        Bind event.
+
+        Bind a callback to a specific setting change on the Sensibo device.
+        This will bind a callback for all devices that have a polling cycle
+        running.
+
+        :param property_name: The name of the item to monitor for changes.
+        Can be one of the following:
+
+            * ``'mode'`` - Operating mode.
+            * ``'power'`` - Power.
+            * ``'room_temp'`` - Temperature of the room.
+            * ``'room_humidity'`` - Humidity of the room.
+            * ``'battery_voltage'`` - Battery voltage (if supported)
+            * ``'swing'`` - Air flow control.
+            * ``'temp'`` - Temperature set point.
+            * ``'fan_level'`` - Fan speed.
+            * ``'temp_unit'`` - Unit of measure (C/F).
+            * ``'*'`` - All of the above
+
+        :type property_name: str
+        :param callback: Callable object.
+        When called there are 3 arguments that are passed:
+
+            * event - A ``str`` that represents the name of the event.
+            * value - The new value that has been set.
+            * event object - the object that holds the property that has
+            changed. This will be either a :class:`Pod` instance or a
+            :class:`Mode` instance
+        :return: A unique identifier that is used when unbind from the event.
+        :rtype: str
+        """
 
         property_names = (
             'mode',
@@ -980,14 +1057,32 @@ class Client(object):
         return Notify.bind('*' + property_name, callback)
 
     def unbind(self, guid):
+        """
+        Unbinds an event callback.
+
+        :param guid: This is returned when an event is bound to a callback.
+        :type guid: str
+        :return: None
+        :rtype: None
+        """
         Notify.unbind(guid)
 
     @property
     def device_names(self):
+        """
+        Gets all available unit (room) names.
+        :return: a `list` of all available unit (room) names.
+        :rtype: list
+        """
         return sorted(self.devices.keys())
 
     @property
     def devices(self):
+        """
+        Gets all unit names and accompanying UID's for the units.
+        :return: `dict` of the names: uid.
+        :rtype: dict
+        """
         params = dict(
             apiKey=self._api_key,
             fields="id,room"
@@ -1008,17 +1103,29 @@ class Client(object):
         return dict(devices)
 
     def get_device(self, name):
+        """
+        Get device.
+
+        Creates a :class:`Pod` instance that represents a device.
+
+        :param name: Unit (room) name.
+        :type name: str
+        :return: A :class:`Pod` instance
+        :rtype: Pod
+        """
         devices = self.devices
 
         try:
             name = name.decode('utf-8')
         except UnicodeDecodeError:
+
             try:
                 name = (
-                    name.decode('latin-1').encode('utf-8')
+                    name.decode('latin-1').decode('utf-8')
                 )
-            except UnicodeDecodeError:
+            except UnicodeEncodeError:
                 pass
+
         except AttributeError:
             pass
 
